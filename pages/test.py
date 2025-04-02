@@ -66,17 +66,16 @@ layout = html.Div(
             ],
             className='center test_form',
         ),
-        dbc.Spinner(html.Div(id='prediction-result')),
+        dbc.Spinner(
+            html.Div(
+                id='prediction-result',
+                className='center',
+                style={'marginTop': '20px', 'minHeight': '60px', 'minWidth': '60px'},
+            )
+        ),
     ],
     className='center',
 )
-
-
-def save_model_from_bin(filename, data, path):
-    with open(f'{path}/{filename}', 'wb') as file:
-        print('asdasdasd')
-        file.write(data)
-        print('after')
 
 
 def decode_image(image_contents):
@@ -114,10 +113,9 @@ def change_image_upload_text(contents, filename):
         State('upload-model', 'contents'),
         State('upload-model', 'filename'),
         State('upload-image', 'contents'),
-        State('upload-image', 'filename'),
     ],
 )
-def predict(n_clicks, model_contents, model_filename, image_contents, image_filename):
+def predict(n_clicks, model_contents, model_filename, image_contents):
     if n_clicks > 0 and not (model_contents and image_contents):
         return 'Ошибка, заполните форму правильно', ''
 
@@ -138,10 +136,11 @@ def predict(n_clicks, model_contents, model_filename, image_contents, image_file
             prepared_img = prepare_image.prepare(img_array)
             model: keras.models.Sequential = keras.models.load_model(path)
             output = model.predict(np.array([prepared_img]), verbose=0)
-            print(max(output))
-            label, prob = np.argmax(output), float(max(output))
-        # os.remove(path)
+            label, prob = np.argmax(output), output.max()
+            label = prepare_image.tf_idx_label_map[label]
+        os.remove(path)
         return '', [
+            html.Img(src=image_contents, style={'width': '300px'}),
             html.H3(f'Предсказанный класс: {label}'),
             html.P(f'Вероятность: {prob:.2f}'),
         ]

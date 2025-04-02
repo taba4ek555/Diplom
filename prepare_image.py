@@ -35,7 +35,7 @@ def get_box(fl, w, h):
 
 
 def prepare(image):
-    mp_face_mesh = mp.solutions.fase_mesh
+    mp_face_mesh = mp.solutions.face_mesh
     with mp_face_mesh.FaceMesh(
         max_num_faces=1,
         refine_landmarks=False,
@@ -131,7 +131,7 @@ class PTHPipeLine:
                 )
 
                 cl = np.argmax(output)
-                return pth_idx_label_map[cl], max(output)
+                return pth_idx_label_map[cl], output.max()
 
 
 pth_idx_label_map = {
