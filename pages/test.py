@@ -104,9 +104,27 @@ def change_image_upload_text(contents, filename):
 
 
 @callback(
+    Output('predict-button', 'disabled'),
+    Input('predict-button', 'n_clicks'),
+)
+def disable_button(n_clicks):
+    return True if n_clicks > 0 else False
+
+
+@callback(
     [
         Output(component_id='error', component_property='children'),
         Output(component_id='prediction-result', component_property='children'),
+        Output(
+            component_id='predict-button',
+            component_property='disabled',
+            allow_duplicate=True,
+        ),
+        Output(
+            component_id='predict-button',
+            component_property='n_clicks',
+            allow_duplicate=True,
+        ),
     ],
     Input('predict-button', 'n_clicks'),
     [
@@ -114,6 +132,7 @@ def change_image_upload_text(contents, filename):
         State('upload-model', 'filename'),
         State('upload-image', 'contents'),
     ],
+    prevent_initial_call=True,
 )
 def predict(n_clicks, model_contents, model_filename, image_contents):
     if n_clicks > 0 and not (model_contents and image_contents):
@@ -139,9 +158,14 @@ def predict(n_clicks, model_contents, model_filename, image_contents):
             label, prob = np.argmax(output), output.max()
             label = prepare_image.tf_idx_label_map[label]
         os.remove(path)
-        return '', [
-            html.Img(src=image_contents, style={'width': '300px'}),
-            html.H3(f'Предсказанный класс: {label}'),
-            html.P(f'Вероятность: {prob:.2f}'),
-        ]
+        return (
+            '',
+            [
+                html.Img(src=image_contents, style={'width': '300px'}),
+                html.H3(f'Предсказанный класс: {label}'),
+                html.P(f'Вероятность: {prob:.2f}'),
+            ],
+            False,
+            0,
+        )
     return '', ''
