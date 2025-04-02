@@ -87,6 +87,24 @@ def decode_image(image_contents):
 
 
 @callback(
+    Output(component_id='model-upload-text', component_property='children'),
+    Input('upload-model', 'contents'),
+    State('upload-model', 'filename'),
+)
+def change_model_upload_text(contents, filename):
+    return filename if filename else ['Перетащите или ', html.A('выберите файл модели')]
+
+
+@callback(
+    Output(component_id='image-upload-text', component_property='children'),
+    Input('upload-image', 'contents'),
+    State('upload-image', 'filename'),
+)
+def change_image_upload_text(contents, filename):
+    return filename if filename else ['Перетащите или ', html.A('выберите фото')]
+
+
+@callback(
     [
         Output(component_id='error', component_property='children'),
         Output(component_id='prediction-result', component_property='children'),
