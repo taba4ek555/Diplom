@@ -1,13 +1,17 @@
 import dash
 from dash import Output, html, dcc, callback, Input, State
 import dash_bootstrap_components as dbc
+import keras
+import torch
 import prepare_image
 from PIL import Image
 import io
 import base64
 import numpy as np
+import os
 
 dash.register_page(__name__, path='/')
+models_path = '/temp_models'
 
 layout = html.Div(
     [
@@ -17,8 +21,10 @@ layout = html.Div(
                 html.P(id='error', style={'color': 'red'}),
                 dcc.Upload(
                     id='upload-model',
-                    children=html.Div(
-                        ['Перетащите или ', html.A('выберите файл модели')]
+                    children=dbc.Spinner(
+                        html.Div(
+                            id='model-upload-text',
+                        )
                     ),
                     style={
                         'height': '60px',
@@ -34,7 +40,11 @@ layout = html.Div(
                 ),
                 dcc.Upload(
                     id='upload-image',
-                    children=html.Div(['Перетащите или ', html.A('выберите фото')]),
+                    children=dbc.Spinner(
+                        html.Div(
+                            id='image-upload-text',
+                        )
+                    ),
                     style={
                         'height': '60px',
                         'width': '100%',
@@ -56,20 +66,23 @@ layout = html.Div(
             ],
             className='center test_form',
         ),
-        html.Div(id='prediction-result'),
+        dbc.Spinner(html.Div(id='prediction-result')),
     ],
     className='center',
 )
 
 
 def save_model_from_bin(filename, data, path):
-    pass
+    with open(f'{path}/{filename}', 'wb') as file:
+        print('asdasdasd')
+        file.write(data)
+        print('after')
 
 
 def decode_image(image_contents):
     content_string = image_contents.split(',')[1]
     decoded = base64.b64decode(content_string)
-    img = np.array(Image.open(io.BytesIO(decoded)))
+    img = np.array(Image.open(io.BytesIO(decoded)))[:, :, :3]
     return img
 
 
@@ -88,22 +101,30 @@ def decode_image(image_contents):
 )
 def predict(n_clicks, model_contents, model_filename, image_contents, image_filename):
     if n_clicks > 0 and not (model_contents and image_contents):
-        return 'Ошибка, заполните форму правильно', html.Div()
-    if n_clicks > 0:
-        save_model_from_bin(model_filename, model_contents, '/models')
-        if model_filename.split('.')[1] == 'pth':
-            pipeline = prepare_image.PTHPipeLine()
-        else:
-            pass
-        img_array = prepare_image.prepare(decode_image(image_contents))
-        print(img_array)
-    return '', ''
-    # prediction = model.predict(img_array)
-    # predicted_class = np.argmax(prediction, axis=1)
+        return 'Ошибка, заполните форму правильно', ''
 
-    # return html.Div(
-    #     [
-    #         html.H3(f'Предсказанный класс: {predicted_label}'),
-    #         html.P(f'Вероятность: {prediction[0][predicted_class[0]]:.2f}'),
-    #     ]
-    # )
+    if n_clicks > 0:
+        path = f'{models_path}/{model_filename}'
+        decoded = base64.b64decode(model_contents.split(',')[1])
+        if not os.path.exists(models_path):
+            os.makedirs(models_path)
+        with open(path, 'wb') as file:
+            file.write(decoded)
+
+        img_array = decode_image(image_contents)
+        if model_filename.split('.')[1] == 'pth':
+            model = torch.jit.load(f'{models_path}/{model_filename}')
+            pipeline = prepare_image.PTHPipeLine(model)
+            label, prob = pipeline(image=img_array)
+        else:
+            prepared_img = prepare_image.prepare(img_array)
+            model: keras.models.Sequential = keras.models.load_model(path)
+            output = model.predict(np.array([prepared_img]), verbose=0)
+            print(max(output))
+            label, prob = np.argmax(output), float(max(output))
+        # os.remove(path)
+        return '', [
+            html.H3(f'Предсказанный класс: {label}'),
+            html.P(f'Вероятность: {prob:.2f}'),
+        ]
+    return '', ''

@@ -131,7 +131,7 @@ class PTHPipeLine:
                 )
 
                 cl = np.argmax(output)
-                return pth_idx_label_map[cl]
+                return pth_idx_label_map[cl], max(output)
 
 
 pth_idx_label_map = {
