@@ -1,5 +1,5 @@
 import dash
-from dash import html, dcc, callback, Input, State, Output
+from dash import html, dcc, callback, Input, State, Output, ALL
 import dash_bootstrap_components as dbc
 import keras
 
@@ -47,6 +47,7 @@ def create_class_upload(id_suffix):
             'display': 'flex',
             'justifyContent': 'space-between',
             'alignItems': 'center',
+            'marginBottom': '10px',
         },
     )
 
@@ -105,6 +106,24 @@ def add_class(n_clicks, children):
     if n_clicks >= len(children):
         new_child = create_class_upload(len(children))
         children.append(new_child)
+    return children
+
+
+@dash.callback(
+    Output("classes-wrapper", "children", allow_duplicate=True),
+    [Input({'type': 'delete-class', 'index': ALL}, 'n_clicks')],
+    [
+        State({'type': 'delete-class', 'index': ALL}, 'id'),
+        State("classes-wrapper", "children"),
+    ],
+    prevent_initial_call=True,
+)
+def delete_class(n_clicks, ids, children):
+    if n_clicks:
+        index_to_delete = [i for i, id_dict in enumerate(ids) if n_clicks[i]]
+        children = [
+            child for i, child in enumerate(children) if i not in index_to_delete
+        ]
     return children
 
 
