@@ -1,8 +1,55 @@
 import dash
 from dash import html, dcc, callback, Input, State, Output
 import dash_bootstrap_components as dbc
+import keras
 
 dash.register_page(__name__, path='/train')
+
+available_layers = [
+    'Conv2D',
+    'BatchNormalization',
+    'Dense',
+    'MaxPool2D',
+    'Flatten',
+    'Dropout',
+]
+available_optimizers = [
+    optimizer for optimizer in dir(keras.optimizers) if not optimizer.startswith('_')
+]
+available_losses = ['binary_crossentropy', 'sparse_categorical_crossentropy']
+
+
+def create_class_upload(id_suffix):
+    return html.Div(
+        [
+            dcc.Upload(
+                id={'type': 'class-upload', 'index': id_suffix},
+                children=html.Div(['Перетащите или ', html.A('выберите файл')]),
+                style={
+                    'height': '60px',
+                    'width': '100%',
+                    'lineHeight': '60px',
+                    'borderWidth': '1px',
+                    'borderStyle': 'dashed',
+                    'borderRadius': '5px',
+                    'textAlign': 'center',
+                    'padding': '0 10px',
+                },
+                multiple=False,
+            ),
+            dbc.Button(
+                "Удалить",
+                id={'type': 'delete-class', 'index': id_suffix},
+                color="danger",
+            ),
+        ],
+        style={
+            'display': 'flex',
+            'justifyContent': 'space-between',
+            'alignItems': 'center',
+        },
+    )
+
 
 layout = html.Div(
     [
@@ -10,7 +57,7 @@ layout = html.Div(
         dbc.Form(
             [
                 html.P(id='error', style={'color': 'red'}),
-                html.Div(id='classes-wrapper'),
+                html.Div(id='classes-wrapper', children=[create_class_upload(0)]),
                 dbc.Button(
                     '+ Добавить класс',
                     color='dark',
@@ -45,7 +92,20 @@ layout = html.Div(
         ),
     ],
     className='center',
+    style={'padding': '10px'},
 )
+
+
+@callback(
+    Output("classes-wrapper", "children"),
+    [Input("add-class-button", "n_clicks")],
+    [State("classes-wrapper", "children")],
+)
+def add_class(n_clicks, children):
+    if n_clicks >= len(children):
+        new_child = create_class_upload(len(children))
+        children.append(new_child)
+    return children
 
 
 @callback(
