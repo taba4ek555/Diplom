@@ -73,19 +73,20 @@ def create_layer_input(id_suffix):
                     id={'type': 'layer-params', 'index': id_suffix},
                     type='text',
                     placeholder='Параметры слоя',
-                )
+                ),
+                width=5,
             ),
             dbc.Col(
                 dbc.Button(
                     "Удалить",
                     id={'type': 'delete-layer', 'index': id_suffix},
                     color="danger",
-                )
+                ),
+                width=2,
             ),
         ],
         align="center",
         justify="between",
-        className="g-0",
         style={'marginBottom': '10px'},
     )
 
@@ -96,7 +97,7 @@ layout = html.Div(
         dbc.Form(
             [
                 html.P(id='error', style={'color': 'red'}),
-                html.Label('Классы'),
+                html.Label(html.Strong('Классы')),
                 html.Div(id='classes-wrapper', children=[create_class_upload(0)]),
                 dbc.Button(
                     '+ Добавить класс',
@@ -105,7 +106,16 @@ layout = html.Div(
                     n_clicks=0,
                     style={'width': '100%'},
                 ),
-                html.Label('Слои'),
+                html.Label(id='test-split-label'),
+                dcc.Input(
+                    id='test-split-input',
+                    max=100,
+                    min=1,
+                    type='range',
+                    value=25,
+                    step=1,
+                ),
+                html.Label(html.Strong('Слои')),
                 html.Div(id='layers-wrapper', children=[create_layer_input(0)]),
                 dbc.Button(
                     '+ Добавить слой',
@@ -114,7 +124,7 @@ layout = html.Div(
                     n_clicks=0,
                     style={'width': '100%'},
                 ),
-                html.Label('Функция потерь'),
+                html.Label(html.Strong('Функция потерь')),
                 dcc.Dropdown(
                     id="loss-function",
                     options=[
@@ -122,7 +132,7 @@ layout = html.Div(
                     ],
                     placeholder='Выберите функцию потерь',
                 ),
-                html.Label('Оптимизатор и learning rate'),
+                html.Label(html.Strong('Оптимизатор и learning rate')),
                 dbc.Row(
                     [
                         dbc.Col(
@@ -160,7 +170,9 @@ layout = html.Div(
                     step=1,
                 ),
                 html.Label(
-                    'Название файла (без указания расширения, по умолчанию .keras)'
+                    html.Strong(
+                        'Название файла (без указания расширения, по умолчанию .keras)'
+                    )
                 ),
                 dbc.Input(id='model-name-input', placeholder='Напишите название файла'),
                 dbc.Button(
@@ -223,8 +235,16 @@ def add_layer(n_clicks, children):
 
 
 @callback(
+    Output(component_id='test-split-label', component_property='children'),
+    Input('test-split-input', 'value'),
+)
+def show_test_split_val(val):
+    return html.Strong(f'Размер тестовой выборки: {val}%')
+
+
+@callback(
     Output(component_id='epoch-count-label', component_property='children'),
     Input('epoch-count-input', 'value'),
 )
 def show_epoch_count(val):
-    return f'Количество эпох: {val}'
+    return html.Strong(f'Количество эпох: {val}')
