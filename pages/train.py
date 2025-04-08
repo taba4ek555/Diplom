@@ -20,35 +20,73 @@ available_losses = ['binary_crossentropy', 'sparse_categorical_crossentropy']
 
 
 def create_class_upload(id_suffix):
-    return html.Div(
+    return dbc.Row(
         [
-            dcc.Upload(
-                id={'type': 'class-upload', 'index': id_suffix},
-                children=html.Div(['Перетащите или ', html.A('выберите файл')]),
-                style={
-                    'height': '60px',
-                    'width': '100%',
-                    'lineHeight': '60px',
-                    'borderWidth': '1px',
-                    'borderStyle': 'dashed',
-                    'borderRadius': '5px',
-                    'textAlign': 'center',
-                    'padding': '0 10px',
-                },
-                multiple=False,
+            dbc.Col(
+                dcc.Upload(
+                    id={'type': 'class-upload', 'index': id_suffix},
+                    children=html.Div(['Перетащите или ', html.A('выберите файл')]),
+                    style={
+                        'height': '60px',
+                        'width': '100%',
+                        'lineHeight': '60px',
+                        'borderWidth': '1px',
+                        'borderStyle': 'dashed',
+                        'borderRadius': '5px',
+                        'textAlign': 'center',
+                        'padding': '0 10px',
+                    },
+                    multiple=False,
+                ),
+                width=9,
             ),
-            dbc.Button(
-                "Удалить",
-                id={'type': 'delete-class', 'index': id_suffix},
-                color="danger",
+            dbc.Col(
+                dbc.Button(
+                    "Удалить",
+                    id={'type': 'delete-class', 'index': id_suffix},
+                    color="danger",
+                ),
+                width=2,
             ),
         ],
-        style={
-            'display': 'flex',
-            'justifyContent': 'space-between',
-            'alignItems': 'center',
-            'marginBottom': '10px',
-        },
+        align="center",
+        justify="between",
+        className="g-0",
+        style={'marginBottom': '10px'},
+    )
+
+
+def create_layer_input(id_suffix):
+    return dbc.Row(
+        [
+            dbc.Col(
+                dcc.Dropdown(
+                    id={'type': 'layer-type', 'index': id_suffix},
+                    options=[
+                        {'label': layer, 'value': layer} for layer in available_layers
+                    ],
+                    placeholder='Выберите тип слоя',
+                )
+            ),
+            dbc.Col(
+                dcc.Input(
+                    id={'type': 'layer-params', 'index': id_suffix},
+                    type='text',
+                    placeholder='Параметры слоя',
+                )
+            ),
+            dbc.Col(
+                dbc.Button(
+                    "Удалить",
+                    id={'type': 'delete-layer', 'index': id_suffix},
+                    color="danger",
+                )
+            ),
+        ],
+        align="center",
+        justify="between",
+        className="g-0",
+        style={'marginBottom': '10px'},
     )
 
 
@@ -66,6 +104,7 @@ layout = html.Div(
                     n_clicks=0,
                     style={'width': '100%'},
                 ),
+                html.Div(id='layers-wrapper', children=[create_layer_input(0)]),
                 dbc.Button(
                     '+ Добавить слой',
                     color='dark',
@@ -99,8 +138,8 @@ layout = html.Div(
 
 @callback(
     Output("classes-wrapper", "children"),
-    [Input("add-class-button", "n_clicks")],
-    [State("classes-wrapper", "children")],
+    Input("add-class-button", "n_clicks"),
+    State("classes-wrapper", "children"),
 )
 def add_class(n_clicks, children):
     if n_clicks >= len(children):
@@ -109,21 +148,35 @@ def add_class(n_clicks, children):
     return children
 
 
-@dash.callback(
+@callback(
     Output("classes-wrapper", "children", allow_duplicate=True),
-    [Input({'type': 'delete-class', 'index': ALL}, 'n_clicks')],
+    Input({'type': 'delete-class', 'index': ALL}, 'n_clicks'),
     [
         State({'type': 'delete-class', 'index': ALL}, 'id'),
         State("classes-wrapper", "children"),
+        State("add-class-button", "n_clicks"),
     ],
     prevent_initial_call=True,
 )
-def delete_class(n_clicks, ids, children):
+def delete_class(n_clicks, ids, children, add_btn_clicks):
     if n_clicks:
         index_to_delete = [i for i, id_dict in enumerate(ids) if n_clicks[i]]
         children = [
             child for i, child in enumerate(children) if i not in index_to_delete
         ]
+        add_btn_clicks -= 1
+    return children
+
+
+@callback(
+    Output("layers-wrapper", "children"),
+    Input("add-layer-button", "n_clicks"),
+    State("layers-wrapper", "children"),
+)
+def add_layer(n_clicks, children):
+    if n_clicks >= len(children):
+        new_child = create_layer_input(len(children))
+        children.append(new_child)
     return children
 
 
