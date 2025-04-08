@@ -69,7 +69,7 @@ def create_layer_input(id_suffix):
                 )
             ),
             dbc.Col(
-                dcc.Input(
+                dbc.Input(
                     id={'type': 'layer-params', 'index': id_suffix},
                     type='text',
                     placeholder='Параметры слоя',
@@ -96,6 +96,7 @@ layout = html.Div(
         dbc.Form(
             [
                 html.P(id='error', style={'color': 'red'}),
+                html.Label('Классы'),
                 html.Div(id='classes-wrapper', children=[create_class_upload(0)]),
                 dbc.Button(
                     '+ Добавить класс',
@@ -104,6 +105,7 @@ layout = html.Div(
                     n_clicks=0,
                     style={'width': '100%'},
                 ),
+                html.Label('Слои'),
                 html.Div(id='layers-wrapper', children=[create_layer_input(0)]),
                 dbc.Button(
                     '+ Добавить слой',
@@ -119,6 +121,34 @@ layout = html.Div(
                         {'label': loss, 'value': loss} for loss in available_losses
                     ],
                     placeholder='Выберите функцию потерь',
+                ),
+                html.Label('Оптимизатор и learning rate'),
+                dbc.Row(
+                    [
+                        dbc.Col(
+                            dcc.Dropdown(
+                                id="optimizer",
+                                options=[
+                                    {'label': opt, 'value': opt}
+                                    for opt in available_optimizers
+                                ],
+                                placeholder='Выберите оптимизатор',
+                            ),
+                            width=6,
+                        ),
+                        dbc.Col(
+                            dbc.Input(
+                                id="learning-rate",
+                                type="number",
+                                placeholder="Введите learning rate",
+                                max=1,
+                                min=0.0001,
+                                step=0.0001,
+                            ),
+                            width=6,
+                        ),
+                    ],
+                    style={'display': 'flex'},
                 ),
                 html.Label(id='epoch-count-label'),
                 dcc.Input(
