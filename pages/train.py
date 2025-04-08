@@ -159,6 +159,10 @@ layout = html.Div(
                     value=10,
                     step=1,
                 ),
+                html.Label(
+                    'Название файла (без указания расширения, по умолчанию .keras)'
+                ),
+                dbc.Input(id='model-name-input', placeholder='Напишите название файла'),
                 dbc.Button(
                     'Обучить',
                     id='train-button',
