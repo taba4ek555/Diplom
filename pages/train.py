@@ -112,6 +112,14 @@ layout = html.Div(
                     n_clicks=0,
                     style={'width': '100%'},
                 ),
+                html.Label('Функция потерь'),
+                dcc.Dropdown(
+                    id="loss-function",
+                    options=[
+                        {'label': loss, 'value': loss} for loss in available_losses
+                    ],
+                    placeholder='Выберите функцию потерь',
+                ),
                 html.Label(id='epoch-count-label'),
                 dcc.Input(
                     id='epoch-count-input',
