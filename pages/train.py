@@ -72,7 +72,7 @@ def create_layer_input(id_suffix):
                 dbc.Input(
                     id={'type': 'layer-params', 'index': id_suffix},
                     type='text',
-                    placeholder='Параметры слоя',
+                    placeholder='Параметры слоя (key=value)',
                 ),
                 width=5,
             ),
@@ -96,7 +96,7 @@ layout = html.Div(
         html.H1('Обучение нейросети'),
         dbc.Form(
             [
-                html.P(id='error', style={'color': 'red'}),
+                html.P(id='train-form-error', style={'color': 'red'}),
                 html.Label(html.Strong('Классы')),
                 html.Div(id='classes-wrapper', children=[create_class_upload(0)]),
                 dbc.Button(
@@ -154,6 +154,7 @@ layout = html.Div(
                                 max=1,
                                 min=0.0001,
                                 step=0.0001,
+                                value=0.001,
                             ),
                             width=6,
                         ),
@@ -248,3 +249,50 @@ def show_test_split_val(val):
 )
 def show_epoch_count(val):
     return html.Strong(f'Количество эпох: {val}')
+
+
+def build_model():
+    pass
+
+
+@callback(
+    [Output(component_id='train-form-error', component_property='children')],
+    Input('train-button', 'n_clicks'),
+    [
+        State({'type': 'class-upload', 'index': ALL}, 'contents'),
+        State('test-split-input', 'value'),
+        State({'type': 'layer-type', 'index': ALL}, 'value'),
+        State({'type': 'layer-params', 'index': ALL}, 'value'),
+        State('optimizer', 'value'),
+        State('learning-rate', 'value'),
+        State('loss-function', 'value'),
+        State('model-name-input', 'value'),
+    ],
+)
+def handle_form(
+    n_clicks,
+    class_contents,
+    test_sample_size,
+    layer_types,
+    layer_params,
+    optimizer,
+    learning_rate,
+    loss_function,
+    model_filename,
+):
+    if n_clicks:
+        print("Class contents:", class_contents)
+        print("Test sample size:", test_sample_size)
+        print("Layer types:", layer_types)
+        print("Layer params:", layer_params)
+        print("Optimizer:", optimizer)
+        print("Learning rate:", learning_rate)
+        print("Loss function:", loss_function)
+        if (
+            class_contents[0] is None
+            or layer_types[0] is None
+            or layer_params[0] is None
+            or not any([optimizer, loss_function, model_filename])
+        ):
+            return ('Ошибка, заполните форму правильно',)
+    return ('',)
