@@ -1,7 +1,14 @@
+import base64
 import dash
 from dash import html, dcc, callback, Input, State, Output, ALL
 import dash_bootstrap_components as dbc
 import keras
+import zipfile
+import os
+from PIL import Image
+import numpy as np
+import shutil
+from prepare_image import prepare, tf_label_idx_map
 
 dash.register_page(__name__, path='/train')
 
@@ -17,43 +24,6 @@ available_optimizers = [
     optimizer for optimizer in dir(keras.optimizers) if not optimizer.startswith('_')
 ]
 available_losses = ['binary_crossentropy', 'sparse_categorical_crossentropy']
-
-
-def create_class_upload(id_suffix):
-    return dbc.Row(
-        [
-            dbc.Col(
-                dcc.Upload(
-                    id={'type': 'class-upload', 'index': id_suffix},
-                    children=html.Div(['Перетащите или ', html.A('выберите файл')]),
-                    style={
-                        'height': '60px',
-                        'width': '100%',
-                        'lineHeight': '60px',
-                        'borderWidth': '1px',
-                        'borderStyle': 'dashed',
-                        'borderRadius': '5px',
-                        'textAlign': 'center',
-                        'padding': '0 10px',
-                    },
-                    multiple=False,
-                ),
-                width=9,
-            ),
-            dbc.Col(
-                dbc.Button(
-                    "Удалить",
-                    id={'type': 'delete-class', 'index': id_suffix},
-                    color="danger",
-                ),
-                width=2,
-            ),
-        ],
-        align="center",
-        justify="between",
-        className="g-0",
-        style={'marginBottom': '10px'},
-    )
 
 
 def create_layer_input(id_suffix):
@@ -98,14 +68,21 @@ layout = html.Div(
         dbc.Form(
             [
                 html.P(id='train-form-error', style={'color': 'red'}),
-                html.Label(html.Strong('Классы')),
-                html.Div(id='classes-wrapper', children=[create_class_upload(0)]),
-                dbc.Button(
-                    '+ Добавить класс',
-                    color='dark',
-                    id='add-class-button',
-                    n_clicks=0,
-                    style={'width': '100%'},
+                html.Label(html.Strong('Данные')),
+                dcc.Upload(
+                    id='data-upload',
+                    children=dbc.Spinner(html.P(id='data-upload-text')),
+                    style={
+                        'height': '60px',
+                        'width': '100%',
+                        'lineHeight': '60px',
+                        'borderWidth': '1px',
+                        'borderStyle': 'dashed',
+                        'borderRadius': '5px',
+                        'textAlign': 'center',
+                        'padding': '0 10px',
+                    },
+                    multiple=False,
                 ),
                 html.Label(id='test-split-label'),
                 dcc.Input(
@@ -193,35 +170,12 @@ layout = html.Div(
 
 
 @callback(
-    Output("classes-wrapper", "children"),
-    Input("add-class-button", "n_clicks"),
-    State("classes-wrapper", "children"),
+    Output("data-upload-text", "children"),
+    Input("data-upload", "contents"),
+    State("data-upload", "filename"),
 )
-def add_class(n_clicks, children):
-    if n_clicks >= len(children):
-        new_child = create_class_upload(len(children))
-        children.append(new_child)
-    return children
-
-
-@callback(
-    Output("classes-wrapper", "children", allow_duplicate=True),
-    Input({'type': 'delete-class', 'index': ALL}, 'n_clicks'),
-    [
-        State({'type': 'delete-class', 'index': ALL}, 'id'),
-        State("classes-wrapper", "children"),
-        State("add-class-button", "n_clicks"),
-    ],
-    prevent_initial_call=True,
-)
-def delete_class(n_clicks, ids, children, add_btn_clicks):
-    if n_clicks:
-        index_to_delete = [i for i, id_dict in enumerate(ids) if n_clicks[i]]
-        children = [
-            child for i, child in enumerate(children) if i not in index_to_delete
-        ]
-        add_btn_clicks -= 1
-    return children
+def add_upload_text(contents, filename):
+    return filename if filename else ['Перетащите или ', html.A('выберите архив')]
 
 
 @callback(
@@ -252,6 +206,32 @@ def show_epoch_count(val):
     return html.Strong(f'Количество эпох: {val}')
 
 
+def load_data(data_zip) -> tuple[np.ndarray, np.ndarray]:
+    path = './data'
+    with open(f'{path}.zip', 'wb') as file:
+        file.write(base64.b64decode(data_zip))
+    with zipfile.ZipFile(f'{path}.zip', 'r') as zip_ref:
+        zip_ref.extractall(path)
+    train_images = []
+    train_labels = []
+    folders = [folder for folder in os.listdir(path) if folder[0] != '.']
+    for i in range(len(folders)):
+        folder = folders[i]
+        for image_path in os.listdir(f'{path}/{folder}'):
+            image = Image.open(f'{path}/{folder}/{image_path}')
+            try:
+                image = Image.fromarray(prepare(np.array(image)))
+            except ValueError:
+                continue
+            train_images.append(np.array(image))
+            train_labels.append(tf_label_idx_map[folder])
+    train_images = np.array(train_images)
+    train_labels = np.array(train_labels)
+    os.remove('./data.zip')
+    shutil.rmtree('./data')
+    return train_images, train_labels
+
+
 def parse_params(params: str) -> dict:
     splitted_params = params.split(' ')
     params_dict = {}
@@ -279,11 +259,27 @@ def build_model(input_shape, layers, params) -> keras.models.Sequential:
     return model
 
 
+def train_model():
+    pass
+
+
 @callback(
-    [Output(component_id='train-form-error', component_property='children')],
+    Output('train-button', 'disabled', allow_duplicate=True),
+    Input('train-button', 'n_clicks'),
+    prevent_initial_call=True,
+)
+def disable_train_button(n_clicks):
+    return True if n_clicks else False
+
+
+@callback(
+    [
+        Output(component_id='train-form-error', component_property='children'),
+        Output('train-button', 'disabled'),
+    ],
     Input('train-button', 'n_clicks'),
     [
-        State({'type': 'class-upload', 'index': ALL}, 'contents'),
+        State('data-upload', 'contents'),
         State('test-split-input', 'value'),
         State({'type': 'layer-type', 'index': ALL}, 'value'),
         State({'type': 'layer-params', 'index': ALL}, 'value'),
@@ -307,19 +303,18 @@ def handle_form(
     model_filename,
 ):
     if n_clicks:
-        print("Class contents:", class_contents)
         print("Test sample size:", test_sample_size)
         print("Layer types:", layer_types)
         print("Layer params:", layer_params)
         print("Optimizer:", optimizer)
         print("Learning rate:", learning_rate)
         print("Loss function:", loss_function)
+        train_images, train_labels = load_data(class_contents)
         model = build_model(
             input_shape=(250, 250, 3),
             layers=['Conv2D'],
             params=['kernel_size=(2,2) filters=25'],
         )
-        print(model.summary())
         checkpoint_callback = keras.callbacks.ModelCheckpoint(
             f'./{model_filename}.keras',
             save_weights_only=False,
@@ -327,6 +322,7 @@ def handle_form(
             save_freq="epoch",
             verbose=1,
         )
+        print(model)
         # history = model.fit(
         #     train_images,
         #     train_labels,
@@ -343,6 +339,6 @@ def handle_form(
             or layer_params[0] is None
             or not any([optimizer, loss_function, model_filename])
         ):
-            return ('Ошибка, заполните форму правильно',)
+            return ('Ошибка, заполните форму правильно', False)
 
-    return ('',)
+    return ('', False)
