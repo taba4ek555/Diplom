@@ -8,6 +8,7 @@ import os
 from PIL import Image
 import numpy as np
 import shutil
+from sklearn.model_selection import train_test_split
 from prepare_image import prepare, tf_label_idx_map
 
 dash.register_page(__name__, path='/train')
@@ -24,6 +25,7 @@ available_optimizers = [
     optimizer for optimizer in dir(keras.optimizers) if not optimizer.startswith('_')
 ]
 available_losses = ['binary_crossentropy', 'sparse_categorical_crossentropy']
+status_data = {'status': '', 'train_history': ''}
 
 
 def create_layer_input(id_suffix):
@@ -259,8 +261,39 @@ def build_model(input_shape, layers, params) -> keras.models.Sequential:
     return model
 
 
-def train_model():
-    pass
+def train_model(
+    model: keras.models.Sequential,
+    class_contents,
+    test_sample_size,
+    epochs,
+    model_filename,
+    status_data,
+):
+    status_data['status'] = 'Загрузка и обработка данных'
+    train_images, train_labels = load_data(class_contents)
+    X_train, X_test, y_train, y_test = train_test_split(
+        train_images, train_labels, test_size=test_sample_size
+    )
+
+    checkpoint_callback = keras.callbacks.ModelCheckpoint(
+        f'./{model_filename}.keras',
+        save_weights_only=False,
+        save_best_only=True,
+        save_freq="epoch",
+        verbose=1,
+    )
+    model.compile()
+    status_data['status'] = 'Обучение модели'
+    history = model.fit(
+        X_train,
+        X_test,
+        epochs=epochs,
+        callbacks=[checkpoint_callback],
+        validation_data=[y_train, y_test],
+        batch_size=128,
+        # class_weight=model3_class_weight,
+        verbose=1,
+    )
 
 
 @callback(
@@ -309,30 +342,12 @@ def handle_form(
         print("Optimizer:", optimizer)
         print("Learning rate:", learning_rate)
         print("Loss function:", loss_function)
-        train_images, train_labels = load_data(class_contents)
         model = build_model(
             input_shape=(250, 250, 3),
-            layers=['Conv2D'],
-            params=['kernel_size=(2,2) filters=25'],
+            layers=['Conv2D', 'Dense'],
+            params=['kernel_size=(2,2) filters=25', 'units=150, activation="relu"'],
         )
-        checkpoint_callback = keras.callbacks.ModelCheckpoint(
-            f'./{model_filename}.keras',
-            save_weights_only=False,
-            save_best_only=True,
-            save_freq="epoch",
-            verbose=1,
-        )
-        print(model)
-        # history = model.fit(
-        #     train_images,
-        #     train_labels,
-        #     epochs=epochs,
-        #     callbacks=[checkpoint_callback],
-        #     validation_data=[test_images, test_labels],
-        #     batch_size=128,
-        #     # class_weight=model3_class_weight,
-        #     verbose=1,
-        # )
+
         if (
             class_contents[0] is None
             or layer_types[0] is None
