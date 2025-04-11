@@ -5,14 +5,14 @@ import keras
 
 dash.register_page(__name__, path='/train')
 
-available_layers = [
-    'Conv2D',
-    'BatchNormalization',
-    'Dense',
-    'MaxPool2D',
-    'Flatten',
-    'Dropout',
-]
+available_layers = {
+    'Conv2D': keras.layers.Conv2D,
+    'BatchNormalization': keras.layers.BatchNormalization,
+    'Dense': keras.layers.Dense,
+    'MaxPool2D': keras.layers.MaxPool2D,
+    'Flatten': keras.layers.Flatten,
+    'Dropout': keras.layers.Dropout,
+}
 available_optimizers = [
     optimizer for optimizer in dir(keras.optimizers) if not optimizer.startswith('_')
 ]
@@ -63,7 +63,8 @@ def create_layer_input(id_suffix):
                 dcc.Dropdown(
                     id={'type': 'layer-type', 'index': id_suffix},
                     options=[
-                        {'label': layer, 'value': layer} for layer in available_layers
+                        {'label': layer, 'value': layer}
+                        for layer in available_layers.keys()
                     ],
                     placeholder='Выберите тип слоя',
                 )
@@ -251,8 +252,31 @@ def show_epoch_count(val):
     return html.Strong(f'Количество эпох: {val}')
 
 
-def build_model():
-    pass
+def parse_params(params: str) -> dict:
+    splitted_params = params.split(' ')
+    params_dict = {}
+    for param in splitted_params:
+        key, val = param.split('=')
+        if val.isdigit():
+            val = int(val)
+        elif '(' in val:
+            val = tuple(map(int, val.replace('(', '').replace(')', '').split(',')))
+        elif '[' in val:
+            val = list(map(int, val.replace('[', '').replace(')', '').split(',')))
+        elif '.' in val:
+            val = float(val)
+        params_dict[key] = val
+    return params_dict
+
+
+def build_model(input_shape, layers, params) -> keras.models.Sequential:
+    model = keras.models.Sequential()
+    model.add(keras.Input(input_shape))
+    for idx, layer in enumerate(layers):
+        layer_params_dict = parse_params(params[idx])
+        print(layer_params_dict)
+        model.add(available_layers[layer](**layer_params_dict))
+    return model
 
 
 @callback(
@@ -266,6 +290,7 @@ def build_model():
         State('optimizer', 'value'),
         State('learning-rate', 'value'),
         State('loss-function', 'value'),
+        State('epoch-count-input', 'value'),
         State('model-name-input', 'value'),
     ],
 )
@@ -278,6 +303,7 @@ def handle_form(
     optimizer,
     learning_rate,
     loss_function,
+    epochs,
     model_filename,
 ):
     if n_clicks:
@@ -288,6 +314,29 @@ def handle_form(
         print("Optimizer:", optimizer)
         print("Learning rate:", learning_rate)
         print("Loss function:", loss_function)
+        model = build_model(
+            input_shape=(250, 250, 3),
+            layers=['Conv2D'],
+            params=['kernel_size=(2,2) filters=25'],
+        )
+        print(model.summary())
+        checkpoint_callback = keras.callbacks.ModelCheckpoint(
+            f'./{model_filename}.keras',
+            save_weights_only=False,
+            save_best_only=True,
+            save_freq="epoch",
+            verbose=1,
+        )
+        # history = model.fit(
+        #     train_images,
+        #     train_labels,
+        #     epochs=epochs,
+        #     callbacks=[checkpoint_callback],
+        #     validation_data=[test_images, test_labels],
+        #     batch_size=128,
+        #     # class_weight=model3_class_weight,
+        #     verbose=1,
+        # )
         if (
             class_contents[0] is None
             or layer_types[0] is None
@@ -295,4 +344,5 @@ def handle_form(
             or not any([optimizer, loss_function, model_filename])
         ):
             return ('Ошибка, заполните форму правильно',)
+
     return ('',)
