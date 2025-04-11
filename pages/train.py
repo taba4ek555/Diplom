@@ -10,6 +10,8 @@ import numpy as np
 import shutil
 from sklearn.model_selection import train_test_split
 from prepare_image import prepare, tf_label_idx_map
+import plotly.graph_objs as go
+import threading
 
 dash.register_page(__name__, path='/train')
 
@@ -21,11 +23,14 @@ available_layers = {
     'Flatten': keras.layers.Flatten,
     'Dropout': keras.layers.Dropout,
 }
-available_optimizers = [
-    optimizer for optimizer in dir(keras.optimizers) if not optimizer.startswith('_')
-]
+available_optimizers = {
+    'Adam': keras.optimizers.Adam,
+    'Nadam': keras.optimizers.Nadam,
+    'RMSprop': keras.optimizers.RMSprop,
+    'SGD': keras.optimizers.SGD,
+}
 available_losses = ['binary_crossentropy', 'sparse_categorical_crossentropy']
-status_data = {'status': '', 'train_history': ''}
+status_data = {'status': '', 'train_history': {}}
 
 
 def create_layer_input(id_suffix):
@@ -89,11 +94,11 @@ layout = html.Div(
                 html.Label(id='test-split-label'),
                 dcc.Input(
                     id='test-split-input',
-                    max=100,
-                    min=1,
+                    max=1,
+                    min=0.01,
                     type='range',
-                    value=25,
-                    step=1,
+                    value=0.25,
+                    step=0.01,
                 ),
                 html.Label(html.Strong('Слои')),
                 html.Div(id='layers-wrapper', children=[create_layer_input(0)]),
@@ -120,7 +125,7 @@ layout = html.Div(
                                 id="optimizer",
                                 options=[
                                     {'label': opt, 'value': opt}
-                                    for opt in available_optimizers
+                                    for opt in available_optimizers.keys()
                                 ],
                                 placeholder='Выберите оптимизатор',
                             ),
@@ -165,6 +170,12 @@ layout = html.Div(
             ],
             className='center test_form',
         ),
+        dcc.Interval(
+            id='interval-component',
+            interval=1000,
+            n_intervals=0,
+        ),
+        html.P(id='train-status'),
     ],
     className='center',
     style={'padding': '10px'},
@@ -197,7 +208,7 @@ def add_layer(n_clicks, children):
     Input('test-split-input', 'value'),
 )
 def show_test_split_val(val):
-    return html.Strong(f'Размер тестовой выборки: {val}%')
+    return html.Strong(f'Размер тестовой выборки: {val}')
 
 
 @callback(
@@ -235,6 +246,8 @@ def load_data(data_zip) -> tuple[np.ndarray, np.ndarray]:
 
 
 def parse_params(params: str) -> dict:
+    if params == '':
+        return {}
     splitted_params = params.split(' ')
     params_dict = {}
     for param in splitted_params:
@@ -253,7 +266,7 @@ def parse_params(params: str) -> dict:
 
 def build_model(input_shape, layers, params) -> keras.models.Sequential:
     model = keras.models.Sequential()
-    model.add(keras.Input(input_shape))
+    model.add(keras.Input(shape=input_shape))
     for idx, layer in enumerate(layers):
         layer_params_dict = parse_params(params[idx])
         print(layer_params_dict)
@@ -265,35 +278,49 @@ def train_model(
     model: keras.models.Sequential,
     class_contents,
     test_sample_size,
+    loss,
+    optimizer,
+    learning_rate,
     epochs,
     model_filename,
     status_data,
 ):
     status_data['status'] = 'Загрузка и обработка данных'
-    train_images, train_labels = load_data(class_contents)
-    X_train, X_test, y_train, y_test = train_test_split(
-        train_images, train_labels, test_size=test_sample_size
-    )
+    try:
+        train_images, train_labels = load_data(class_contents)
+        X_train, X_test, y_train, y_test = train_test_split(
+            train_images, train_labels, test_size=test_sample_size, random_state=42
+        )
+        print(train_images[0].shape, y_test, type(y_test))
 
-    checkpoint_callback = keras.callbacks.ModelCheckpoint(
-        f'./{model_filename}.keras',
-        save_weights_only=False,
-        save_best_only=True,
-        save_freq="epoch",
-        verbose=1,
-    )
-    model.compile()
-    status_data['status'] = 'Обучение модели'
-    history = model.fit(
-        X_train,
-        X_test,
-        epochs=epochs,
-        callbacks=[checkpoint_callback],
-        validation_data=[y_train, y_test],
-        batch_size=128,
-        # class_weight=model3_class_weight,
-        verbose=1,
-    )
+        checkpoint_callback = keras.callbacks.ModelCheckpoint(
+            f'./{model_filename}.keras',
+            save_weights_only=False,
+            save_best_only=True,
+            save_freq="epoch",
+            verbose=1,
+        )
+        print(model.summary())
+        optimizer = available_optimizers[optimizer](learning_rate=learning_rate)
+        model.compile(
+            loss=loss,
+            optimizer=optimizer,
+            metrics=['accuracy'],
+        )
+        status_data['status'] = 'Обучение модели'
+        model.fit(
+            X_train,
+            y_train,
+            epochs=epochs,
+            callbacks=[checkpoint_callback],
+            validation_data=[X_test, y_test],
+            batch_size=128,
+            # class_weight=model3_class_weight,
+            verbose=1,
+        )
+        status_data['status'] = 'Обучение завершено'
+    finally:
+        status_data['status'] = ''
 
 
 @callback(
@@ -344,9 +371,30 @@ def handle_form(
         print("Loss function:", loss_function)
         model = build_model(
             input_shape=(250, 250, 3),
-            layers=['Conv2D', 'Dense'],
-            params=['kernel_size=(2,2) filters=25', 'units=150, activation="relu"'],
+            layers=['Conv2D', 'Flatten', 'Dense', 'Dense'],
+            params=[
+                'kernel_size=(4,4) filters=1',
+                '',
+                'units=150 activation=relu',
+                'units=3 activation=softmax',
+            ],
         )
+        thread = threading.Thread(
+            target=train_model,
+            args=(
+                model,
+                class_contents,
+                test_sample_size,
+                loss_function,
+                optimizer,
+                learning_rate,
+                epochs,
+                'model',
+                status_data,
+            ),
+        )
+        thread.start()
+        # thread.join()
 
         if (
             class_contents[0] is None
@@ -357,3 +405,10 @@ def handle_form(
             return ('Ошибка, заполните форму правильно', False)
 
     return ('', False)
+
+
+@callback(
+    Output('train-status', 'children'), Input('interval-component', 'n_intervals')
+)
+def update_status(n_intervals):
+    return status_data['status']
