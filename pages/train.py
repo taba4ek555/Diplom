@@ -176,6 +176,8 @@ layout = html.Div(
             n_intervals=0,
         ),
         html.P(id='train-status'),
+        dcc.Graph(id='loss-graph'),
+        dcc.Graph(id='accuracy-graph'),
     ],
     className='center',
     style={'padding': '10px'},
@@ -286,41 +288,45 @@ def train_model(
     status_data,
 ):
     status_data['status'] = 'Загрузка и обработка данных'
-    try:
-        train_images, train_labels = load_data(class_contents)
-        X_train, X_test, y_train, y_test = train_test_split(
-            train_images, train_labels, test_size=test_sample_size, random_state=42
-        )
-        print(train_images[0].shape, y_test, type(y_test))
+    train_images, train_labels = load_data(class_contents)
+    X_train, X_test, y_train, y_test = train_test_split(
+        train_images, train_labels, test_size=test_sample_size, random_state=42
+    )
 
-        checkpoint_callback = keras.callbacks.ModelCheckpoint(
-            f'./{model_filename}.keras',
-            save_weights_only=False,
-            save_best_only=True,
-            save_freq="epoch",
-            verbose=1,
-        )
-        print(model.summary())
-        optimizer = available_optimizers[optimizer](learning_rate=learning_rate)
-        model.compile(
-            loss=loss,
-            optimizer=optimizer,
-            metrics=['accuracy'],
-        )
-        status_data['status'] = 'Обучение модели'
-        model.fit(
-            X_train,
-            y_train,
-            epochs=epochs,
-            callbacks=[checkpoint_callback],
-            validation_data=[X_test, y_test],
-            batch_size=128,
-            # class_weight=model3_class_weight,
-            verbose=1,
-        )
-        status_data['status'] = 'Обучение завершено'
-    finally:
-        status_data['status'] = ''
+    checkpoint_callback = keras.callbacks.ModelCheckpoint(
+        f'./{model_filename}.keras',
+        save_weights_only=False,
+        save_best_only=True,
+        save_freq="epoch",
+        verbose=1,
+    )
+
+    class CustomCallback(keras.callbacks.Callback):
+        def on_epoch_end(self, epoch, logs=None):
+            print(logs.items())
+            for key, value in logs.items():
+                if key not in status_data['train_history']:
+                    status_data['train_history'][key] = []
+                status_data['train_history'][key].append(value)
+
+    optimizer = available_optimizers[optimizer](learning_rate=learning_rate)
+    model.compile(
+        loss=loss,
+        optimizer=optimizer,
+        metrics=['accuracy'],
+    )
+    status_data['status'] = 'Обучение модели'
+    model.fit(
+        X_train,
+        y_train,
+        epochs=epochs,
+        callbacks=[checkpoint_callback, CustomCallback()],
+        validation_data=[X_test, y_test],
+        batch_size=128,
+        # class_weight=model3_class_weight,
+        verbose=1,
+    )
+    status_data['status'] = 'Обучение завершено'
 
 
 @callback(
@@ -412,3 +418,46 @@ def handle_form(
 )
 def update_status(n_intervals):
     return status_data['status']
+
+
+@callback(
+    [Output('loss-graph', 'figure'), Output('accuracy-graph', 'figure')],
+    Input('interval-component', 'n_intervals'),
+)
+def update_graph(n_intervals):
+    loss_traces = []
+    accuracy_traces = []
+    for metric, values in status_data['train_history'].items():
+        if metric[-4:] == 'loss':
+            loss_traces.append(
+                go.Scatter(
+                    x=list(range(len(values))),
+                    y=values,
+                    mode='lines+markers',
+                    name=metric,
+                )
+            )
+        else:
+            accuracy_traces.append(
+                go.Scatter(
+                    x=list(range(len(values))),
+                    y=values,
+                    mode='lines+markers',
+                    name=metric,
+                )
+            )
+
+    loss_layout = go.Layout(
+        title="История обучения",
+        xaxis=dict(title="Эпоха"),
+        yaxis=dict(title="Ошибка"),
+    )
+    accuracy_layout = go.Layout(
+        title="История обучения",
+        xaxis=dict(title="Эпоха"),
+        yaxis=dict(title="Accuracy"),
+    )
+    return {'data': loss_traces, 'layout': loss_layout}, {
+        'data': accuracy_traces,
+        'layout': accuracy_layout,
+    }
