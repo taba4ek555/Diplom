@@ -145,3 +145,4 @@ pth_idx_label_map = {
 }
 
 tf_idx_label_map = {0: 'negative', 1: 'neutral', 2: 'positive'}
+tf_label_idx_map = {'negative': 0, 'neutral': 1, 'positive': 2}
