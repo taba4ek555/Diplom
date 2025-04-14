@@ -178,6 +178,8 @@ layout = html.Div(
         html.P(id='train-status'),
         dcc.Graph(id='loss-graph'),
         dcc.Graph(id='accuracy-graph'),
+        dbc.Button("Скачать файл модели", id="download-model-btn"),
+        dcc.Download(id='download-model'),
     ],
     className='center',
     style={'padding': '10px'},
@@ -369,12 +371,6 @@ def handle_form(
     model_filename,
 ):
     if n_clicks:
-        print("Test sample size:", test_sample_size)
-        print("Layer types:", layer_types)
-        print("Layer params:", layer_params)
-        print("Optimizer:", optimizer)
-        print("Learning rate:", learning_rate)
-        print("Loss function:", loss_function)
         model = build_model(
             input_shape=(250, 250, 3),
             layers=['Conv2D', 'Flatten', 'Dense', 'Dense'],
@@ -409,7 +405,8 @@ def handle_form(
             or not any([optimizer, loss_function, model_filename])
         ):
             return ('Ошибка, заполните форму правильно', False)
-
+        status_data['status'] = ''
+        status_data['train_history'] = {}
     return ('', False)
 
 
@@ -461,3 +458,22 @@ def update_graph(n_intervals):
         'data': accuracy_traces,
         'layout': accuracy_layout,
     }
+
+
+@callback(
+    Output('download-model-btn', 'disabled'),
+    Input('interval-component', 'n_intervals'),
+)
+def download_btn_disable(n_intervals):
+    return status_data['status'] != 'Обучение завершено'
+
+
+@callback(
+    Output('download-model', 'data'),
+    Input('download-model-btn', 'n_clicks'),
+    State('model-name-input', 'value'),
+)
+def add_download_model_btn(n_clicks, filename):
+    if n_clicks:
+        return dcc.send_file(f'./{filename}.keras')
+    return None
