@@ -249,8 +249,8 @@ def load_data(data_zip) -> tuple[np.ndarray, np.ndarray]:
     return train_images, train_labels
 
 
-def parse_params(params: str) -> dict:
-    if params == '':
+def parse_params(params: str | None) -> dict:
+    if params in (' ', None):
         return {}
     splitted_params = params.split(' ')
     params_dict = {}
@@ -371,15 +371,22 @@ def handle_form(
     model_filename,
 ):
     if n_clicks:
+        print(layer_params)
+        if (
+            class_contents[0] is None
+            or layer_types[0] is None
+            or layer_params[0] is None
+            or not any([optimizer, loss_function, model_filename])
+        ):
+            return ('Ошибка, заполните форму правильно', False)
+
+        status_data['status'] = ''
+        status_data['train_history'] = {}
+
         model = build_model(
             input_shape=(250, 250, 3),
-            layers=['Conv2D', 'Flatten', 'Dense', 'Dense'],
-            params=[
-                'kernel_size=(4,4) filters=1',
-                '',
-                'units=150 activation=relu',
-                'units=3 activation=softmax',
-            ],
+            layers=layer_types,
+            params=layer_params,
         )
         thread = threading.Thread(
             target=train_model,
@@ -391,22 +398,11 @@ def handle_form(
                 optimizer,
                 learning_rate,
                 epochs,
-                'model',
+                model_filename,
                 status_data,
             ),
         )
         thread.start()
-        # thread.join()
-
-        if (
-            class_contents[0] is None
-            or layer_types[0] is None
-            or layer_params[0] is None
-            or not any([optimizer, loss_function, model_filename])
-        ):
-            return ('Ошибка, заполните форму правильно', False)
-        status_data['status'] = ''
-        status_data['train_history'] = {}
     return ('', False)
 
 
