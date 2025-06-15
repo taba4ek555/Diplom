@@ -227,25 +227,33 @@ def load_data(data_zip) -> tuple[np.ndarray, np.ndarray]:
     path = './data'
     with open(f'{path}.zip', 'wb') as file:
         file.write(base64.b64decode(data_zip))
+
     with zipfile.ZipFile(f'{path}.zip', 'r') as zip_ref:
         zip_ref.extractall(path)
+
     train_images = []
     train_labels = []
+
     folders = [folder for folder in os.listdir(path) if folder[0] != '.']
     for i in range(len(folders)):
         folder = folders[i]
         for image_path in os.listdir(f'{path}/{folder}'):
             image = Image.open(f'{path}/{folder}/{image_path}')
+
             try:
                 image = Image.fromarray(prepare(np.array(image)))
             except ValueError:
                 continue
+
             train_images.append(np.array(image))
             train_labels.append(tf_label_idx_map[folder])
+
     train_images = np.array(train_images)
     train_labels = np.array(train_labels)
+
     os.remove('./data.zip')
     shutil.rmtree('./data')
+
     return train_images, train_labels
 
 
@@ -273,7 +281,6 @@ def build_model(input_shape, layers, params) -> keras.models.Sequential:
     model.add(keras.Input(shape=input_shape))
     for idx, layer in enumerate(layers):
         layer_params_dict = parse_params(params[idx])
-        print(layer_params_dict)
         model.add(available_layers[layer](**layer_params_dict))
     return model
 
@@ -370,7 +377,6 @@ def handle_form(
     model_filename,
 ):
     if n_clicks:
-        print(layer_params)
         if (
             class_contents[0] is None
             or layer_types[0] is None
