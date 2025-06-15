@@ -128,6 +128,12 @@ def predict_keras(path, img_array):
     return label, prob
 
 
+def predict_torch(path, img_array):
+    model = torch.jit.load(path)
+    pipeline = prepare_image.PTHPipeLine(model)
+    label, prob = pipeline(image=img_array)
+
+
 @callback(
     [
         Output(component_id='error', component_property='children'),
@@ -161,9 +167,7 @@ def predict(n_clicks, model_contents, model_filename, image_contents):
 
         img_array = decode_image(image_contents)
         if model_filename.split('.')[1] == 'pth':
-            model = torch.jit.load(f'{models_path}/{model_filename}')
-            pipeline = prepare_image.PTHPipeLine(model)
-            label, prob = pipeline(image=img_array)
+            label, prob = predict_torch(path, img_array)
         else:
             label, prob = predict_keras(path, img_array)
         os.remove(path)
