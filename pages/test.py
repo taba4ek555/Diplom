@@ -111,6 +111,14 @@ def disable_button(n_clicks):
     return True if n_clicks > 0 else False
 
 
+def save_model(model_contents, path):
+    decoded = base64.b64decode(model_contents)
+    if not os.path.exists(models_path):
+        os.makedirs(models_path)
+    with open(path, 'wb') as file:
+        file.write(decoded)
+
+
 @callback(
     [
         Output(component_id='error', component_property='children'),
@@ -140,11 +148,7 @@ def predict(n_clicks, model_contents, model_filename, image_contents):
 
     if n_clicks > 0:
         path = f'{models_path}/{model_filename}'
-        decoded = base64.b64decode(model_contents.split(',')[1])
-        if not os.path.exists(models_path):
-            os.makedirs(models_path)
-        with open(path, 'wb') as file:
-            file.write(decoded)
+        save_model(model_contents.split(',')[1], path)
 
         img_array = decode_image(image_contents)
         if model_filename.split('.')[1] == 'pth':

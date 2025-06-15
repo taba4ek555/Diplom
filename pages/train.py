@@ -191,7 +191,7 @@ layout = html.Div(
     Input("data-upload", "contents"),
     State("data-upload", "filename"),
 )
-def add_upload_text(contents, filename):
+def add_upload_text(_, filename):
     return filename if filename else ['Перетащите или ', html.A('выберите архив')]
 
 
@@ -325,7 +325,6 @@ def train_model(
         callbacks=[checkpoint_callback, CustomCallback()],
         validation_data=[X_test, y_test],
         batch_size=128,
-        # class_weight=model3_class_weight,
         verbose=1,
     )
     status_data['status'] = 'Обучение завершено'
@@ -409,7 +408,7 @@ def handle_form(
 @callback(
     Output('train-status', 'children'), Input('interval-component', 'n_intervals')
 )
-def update_status(n_intervals):
+def update_status(_):
     return status_data['status']
 
 
