@@ -90,7 +90,7 @@ def decode_image(image_contents):
     Input('upload-model', 'contents'),
     State('upload-model', 'filename'),
 )
-def change_model_upload_text(contents, filename):
+def change_model_upload_text(_, filename):
     return filename if filename else ['Перетащите или ', html.A('выберите файл модели')]
 
 
@@ -99,7 +99,7 @@ def change_model_upload_text(contents, filename):
     Input('upload-image', 'contents'),
     State('upload-image', 'filename'),
 )
-def change_image_upload_text(contents, filename):
+def change_image_upload_text(_, filename):
     return filename if filename else ['Перетащите или ', html.A('выберите фото')]
 
 

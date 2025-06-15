@@ -417,7 +417,7 @@ def update_status(n_intervals):
     [Output('loss-graph', 'figure'), Output('accuracy-graph', 'figure')],
     Input('interval-component', 'n_intervals'),
 )
-def update_graph(n_intervals):
+def update_graph(_):
     loss_traces = []
     accuracy_traces = []
     for metric, values in status_data['train_history'].items():
@@ -460,7 +460,7 @@ def update_graph(n_intervals):
     Output('download-model-btn', 'disabled'),
     Input('interval-component', 'n_intervals'),
 )
-def download_btn_disable(n_intervals):
+def download_btn_disable(_):
     return status_data['status'] != 'Обучение завершено'
 
 
