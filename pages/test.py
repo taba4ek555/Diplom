@@ -119,6 +119,15 @@ def save_model(model_contents, path):
         file.write(decoded)
 
 
+def predict_keras(path, img_array):
+    prepared_img = prepare_image.prepare(img_array)
+    model: keras.models.Sequential = keras.models.load_model(path)
+    output = model.predict(np.array([prepared_img]), verbose=0)
+    label, prob = np.argmax(output), output.max()
+    label = prepare_image.tf_idx_label_map[label]
+    return label, prob
+
+
 @callback(
     [
         Output(component_id='error', component_property='children'),
@@ -156,11 +165,7 @@ def predict(n_clicks, model_contents, model_filename, image_contents):
             pipeline = prepare_image.PTHPipeLine(model)
             label, prob = pipeline(image=img_array)
         else:
-            prepared_img = prepare_image.prepare(img_array)
-            model: keras.models.Sequential = keras.models.load_model(path)
-            output = model.predict(np.array([prepared_img]), verbose=0)
-            label, prob = np.argmax(output), output.max()
-            label = prepare_image.tf_idx_label_map[label]
+            label, prob = predict_keras(path, img_array)
         os.remove(path)
         return (
             '',
